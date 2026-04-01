@@ -1,74 +1,127 @@
-import { Image, StyleSheet, Platform } from 'react-native';
-
-import { HelloWave } from '@/components/HelloWave';
+import { StyleSheet, Platform, ActivityIndicator, TouchableOpacity, View } from 'react-native';
+import { useState, useEffect } from 'react';
+import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import ForecastList from '@/components/ForecastList';
+import LocationSearch from '@/components/LocationSearch';
+import { fetchWeatherData } from '@/utils/weatherApi';
+import WeatherInfo from '@/components/WeatherInfo';
+import WeatherBackground from '@/components/WeatherBackground';
+import AlertBanner from '@/components/AlertBanner';
+import FeatureGrid from '@/components/FeatureGrid';
+import React from 'react';
 
 export default function HomeScreen() {
+  const [weatherData, setWeatherData] = useState<any>(null);
+  const [forecast, setForecast] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [location, setLocation] = useState('Bangalore, Karnataka, India');
+  const [error, setError] = useState<string | null>(null);
+  const [cloudburstAlerts, setCloudburstAlerts] = useState<any[]>([]);
+  const router = useRouter();
+
+  useEffect(() => {
+    loadWeatherData(location);
+
+    if (location) {
+      setCloudburstAlerts([
+        {
+          id: 1,
+          location: location,
+          time: '2 hours from now',
+          intensity: 'High',
+          description: 'Potential cloudburst event with heavy rainfall expected'
+        }
+      ]);
+    }
+  }, [location]);
+
+  const loadWeatherData = async (searchLocation: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await fetchWeatherData(searchLocation);
+      setWeatherData(data.current);
+      setForecast(data.forecast);
+      setLoading(false);
+    } catch (err) {
+      setError('Failed to load weather data');
+      setLoading(false);
+      console.error(err);
+    }
+  };
+
+  const navigateToFeature = (route: string) => {
+    console.log('Navigating to:', route);
+    router.push(route as any);
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12'
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          Tap the Explore tab to learn more about what's included in this starter app.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          When you're ready, run{' '}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <>
+      <StatusBar style="auto" />
+      <ParallaxScrollView
+        headerBackgroundColor={{ light: '#4A90E2', dark: '#1D3D47' }}
+        headerImage={
+          weatherData && 
+          <WeatherBackground condition={weatherData.condition} />
+        }>
+        
+        <ThemedView style={styles.container}>
+          <LocationSearch 
+            onSubmit={setLocation} 
+            initialLocation={location} 
+          />
+          
+          {loading ? (
+            <ActivityIndicator size="large" color="#4A90E2" style={styles.loader} />
+          ) : error ? (
+            <ThemedText style={styles.errorText}>{error}</ThemedText>
+          ) : (
+            <>
+              {cloudburstAlerts.length > 0 && (
+                <AlertBanner  alerts={cloudburstAlerts} />
+              )}
+              
+              <WeatherInfo data={weatherData} />
+              
+              <FeatureGrid 
+                onFeaturePress={navigateToFeature}
+              />
+              
+              <ThemedText type="subtitle" style={styles.forecastTitle}>
+                5-Day Forecast
+              </ThemedText>
+              <ForecastList forecast={forecast} />
+            </>
+          )}
+        </ThemedView>
+      </ParallaxScrollView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
+    padding: 16,
+    gap: 16,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  loader: {
+    marginTop: 50,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  errorText: {
+    color: '#FF3B30',
+    textAlign: 'center',
+    marginTop: 20,
+    fontWeight: '500',
+  },
+  forecastTitle: {
+    marginTop: 20,
+    marginBottom: 10,
+    fontWeight: '600',
   },
 });
